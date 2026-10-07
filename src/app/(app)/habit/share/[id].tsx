@@ -1,14 +1,13 @@
 import { useLocalSearchParams } from 'expo-router';
-import * as Sharing from 'expo-sharing';
 import { useRef, useState } from 'react';
 import { Alert, Platform, View } from 'react-native';
-import { captureRef } from 'react-native-view-shot';
 
 import { ShareCard } from '@/components/social';
 import { Button, EmptyState, Screen } from '@/components/ui';
 import { useMe } from '@/lib/auth';
 import { t } from '@/lib/i18n';
 import { useMyCheckins, useMyHabits, useToday } from '@/lib/queries';
+import { shareImageOf } from '@/lib/share';
 import { currentStreak } from '@/lib/streaks';
 import { space } from '@/lib/theme';
 
@@ -34,8 +33,7 @@ export default function ShareHabit() {
   const share = async () => {
     setBusy(true);
     try {
-      const uri = await captureRef(cardRef, { format: 'png', quality: 1, result: 'tmpfile' });
-      await Sharing.shareAsync(uri, { mimeType: 'image/png', UTI: 'public.png' });
+      await shareImageOf(cardRef);
     } catch {
       Alert.alert(t('shareFailed'));
     } finally {

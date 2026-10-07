@@ -1,9 +1,13 @@
 import { Stack } from 'expo-router';
 import { useEffect } from 'react';
+import { AppState } from 'react-native';
 
+import { useMe } from '@/lib/auth';
 import { t } from '@/lib/i18n';
 import { syncReminders } from '@/lib/notifications';
+import { registerForPush } from '@/lib/push';
 import { useMyCheckins, useMyHabits, useToday } from '@/lib/queries';
+import { useRealtime } from '@/lib/realtime';
 import { useTheme } from '@/lib/theme';
 
 // Deep links (e.g. streakmates://u/alice) open on top of the tabs.
@@ -14,6 +18,7 @@ export default function AppLayout() {
   return (
     <>
       <ReminderSync />
+      <Live />
       <Stack
         screenOptions={{
           headerShadowVisible: false,
@@ -36,9 +41,33 @@ export default function AppLayout() {
         <Stack.Screen name="join/index" options={{ presentation: 'modal', title: t('joinByCode') }} />
         <Stack.Screen name="join/[code]" options={{ title: '' }} />
         <Stack.Screen name="settings" options={{ title: t('settings') }} />
+        <Stack.Screen name="proof/[habitId]" options={{ presentation: 'modal', title: t('proofTitle') }} />
+        <Stack.Screen
+          name="photo"
+          options={{ presentation: 'fullScreenModal', headerShown: false, animation: 'fade' }}
+        />
+        <Stack.Screen name="chat/[id]" options={{ title: t('chat') }} />
+        <Stack.Screen name="activity" options={{ title: t('inbox') }} />
+        <Stack.Screen name="recap" options={{ presentation: 'modal', title: t('weeklyRecap') }} />
       </Stack>
     </>
   );
+}
+
+/** Live chat/notification updates and push registration for the signed-in user. */
+function Live() {
+  const me = useMe();
+  useRealtime(me.id);
+  useEffect(() => {
+    if (!me.id) return;
+    registerForPush(me.id);
+    // the user may have allowed notifications in the system settings meanwhile
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') registerForPush(me.id);
+    });
+    return () => sub.remove();
+  }, [me.id]);
+  return null;
 }
 
 /** Keeps local reminder notifications in line with habits and today's check-ins. */

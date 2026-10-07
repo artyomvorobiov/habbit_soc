@@ -6,7 +6,7 @@ import { Button, Card, EmptyState, IconButton, ListItem, TabScreen } from '@/com
 import { Avatar } from '@/components/visuals';
 import { useMe } from '@/lib/auth';
 import { countOf, t } from '@/lib/i18n';
-import { useFeed, useFriends, useReact } from '@/lib/queries';
+import { useFeed, useFriends, useNotifications, useReact } from '@/lib/queries';
 import { shareInvite } from '@/lib/share';
 import { space } from '@/lib/theme';
 
@@ -15,6 +15,7 @@ export default function FeedScreen() {
   const feed = useFeed();
   const friends = useFriends();
   const react = useReact();
+  const notifications = useNotifications();
 
   const items = feed.data?.pages.flat() ?? [];
   const incoming = friends.data?.filter((f) => f.status === 'incoming') ?? [];
@@ -26,14 +27,20 @@ export default function FeedScreen() {
       subtitle={friends.data ? countOf('friend', friendCount) : undefined}
       right={
         <>
-          <IconButton icon="share-outline" accessibilityLabel={t('inviteFriends')} onPress={() => shareInvite(me.username)} />
           <IconButton icon="person-add-outline" accessibilityLabel={t('addFriend')} onPress={() => router.push('/friends')} />
+          <IconButton
+            icon="notifications-outline"
+            accessibilityLabel={t('inbox')}
+            badge={notifications.unread}
+            onPress={() => router.push('/activity')}
+          />
         </>
       }
       refreshing={feed.isRefetching}
       onRefresh={() => {
         feed.refetch();
         friends.refetch();
+        notifications.refetch();
       }}>
       {incoming.length > 0 ? (
         <View style={{ borderRadius: 16, overflow: 'hidden' }}>

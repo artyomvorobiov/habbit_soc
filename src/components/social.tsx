@@ -2,6 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState, type Ref } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { PhotoButton } from '@/components/photos';
 import { Card, Txt } from '@/components/ui';
 import { ActivityGrid, Avatar, HabitIcon } from '@/components/visuals';
 import type { ISODate } from '@/lib/dates';
@@ -63,6 +64,11 @@ export function FeedItem({
           </View>
         ) : null}
       </View>
+
+      {item.photo_path ? (
+        <PhotoButton path={item.photo_path} url={item.photo_url} caption={item.note} style={styles.photo} />
+      ) : null}
+      {item.note ? <Txt variant="callout">{item.note}</Txt> : null}
 
       <View style={styles.reactions}>
         {counts.map((r) => {
@@ -173,6 +179,7 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
   },
   streak: { fontSize: 17, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  photo: { width: '100%', aspectRatio: 1, borderRadius: radius.md, borderCurve: 'continuous' },
   reactions: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, alignItems: 'center' },
   reaction: {
     flexDirection: 'row',

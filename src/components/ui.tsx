@@ -341,7 +341,7 @@ export function ListItem({
           {title}
         </Txt>
         {subtitle ? (
-          <Txt variant="caption" tone="secondary" numberOfLines={1}>
+          <Txt variant="caption" tone="secondary" numberOfLines={2}>
             {subtitle}
           </Txt>
         ) : null}

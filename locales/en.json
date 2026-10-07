@@ -1,0 +1,6 @@
+{
+  "ios": {
+    "NSCameraUsageDescription": "Streakmates uses the camera to take photo proofs of your habits.",
+    "NSPhotoLibraryUsageDescription": "Streakmates lets you attach photos from your library as proof of your habits and share them in challenge chats."
+  }
+}

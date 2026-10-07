@@ -10,6 +10,7 @@ import { useMe } from '@/lib/auth';
 import { APP_VERSION, PRIVACY_POLICY_URL, SUPPORT_EMAIL } from '@/lib/config';
 import { t } from '@/lib/i18n';
 import { ensureNotificationPermission } from '@/lib/notifications';
+import { unregisterPush } from '@/lib/push';
 import { qk } from '@/lib/queries';
 import { shareInvite } from '@/lib/share';
 import { supabase } from '@/lib/supabase';
@@ -46,7 +47,7 @@ export default function Settings() {
 
   const checkNotifications = async () => {
     if (Platform.OS === 'web') return;
-    const granted = await ensureNotificationPermission();
+    const granted = await ensureNotificationPermission(me.id);
     if (!granted) {
       Alert.alert(t('notifications'), t('notificationsDenied', { app: t('appName') }), [
         { text: t('cancel'), style: 'cancel' },
@@ -66,7 +67,8 @@ export default function Settings() {
         style: 'destructive',
         onPress: async () => {
           try {
-            await deleteAccount();
+            await unregisterPush();
+            await deleteAccount(me.id);
           } catch {
             Alert.alert(t('error'));
           }
@@ -101,7 +103,15 @@ export default function Settings() {
       </List>
 
       <List>
-        <ListItem icon="log-out-outline" title={t('signOut')} chevron={false} onPress={() => supabase.auth.signOut()} />
+        <ListItem
+          icon="log-out-outline"
+          title={t('signOut')}
+          chevron={false}
+          onPress={async () => {
+            await unregisterPush();
+            await supabase.auth.signOut();
+          }}
+        />
         <ListItem icon="trash-outline" title={t('deleteAccount')} destructive chevron={false} onPress={confirmDelete} />
       </List>
 

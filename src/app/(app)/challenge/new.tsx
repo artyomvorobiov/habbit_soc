@@ -27,6 +27,7 @@ export default function NewChallenge() {
   const [length, setLength] = useState(7);
   const [startKey, setStartKey] = useState<'today' | 'tomorrow' | 'monday'>('today');
   const [invited, setInvited] = useState<string[]>(params.invite ? [params.invite] : []);
+  const [proofRequired, setProofRequired] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const starts: Record<typeof startKey, ISODate> = {
@@ -41,7 +42,15 @@ export default function NewChallenge() {
   const create = async () => {
     setBusy(true);
     try {
-      const id = await createChallenge({ title: title.trim(), emoji, color, start, end, invitees: invited });
+      const id = await createChallenge({
+        title: title.trim(),
+        emoji,
+        color,
+        start,
+        end,
+        invitees: invited,
+        proofRequired,
+      });
       await qc.invalidateQueries({ queryKey: qk.challenges });
       refreshHabits();
       router.replace(`/challenge/${id}`);
@@ -91,6 +100,17 @@ export default function NewChallenge() {
           <Chip label={t('startMonday')} selected={startKey === 'monday'} onPress={() => setStartKey('monday')} />
         </View>
       </Field>
+
+      <List>
+        <ListItem
+          title={t('proofRequiredOption')}
+          subtitle={t('proofRequiredOptionHint')}
+          left={<Txt style={{ fontSize: 22 }}>📸</Txt>}
+          chevron={false}
+          onPress={() => setProofRequired(!proofRequired)}
+          right={<Switch value={proofRequired} onValueChange={setProofRequired} />}
+        />
+      </List>
 
       <Field label={t('inviteFriendsToChallenge')}>
         {accepted.length > 0 ? (

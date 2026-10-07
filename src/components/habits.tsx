@@ -3,8 +3,10 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 
+import { ProofButton } from '@/components/photos';
 import { Card, Chip, Field, Input, Segmented, Txt } from '@/components/ui';
 import { CheckButton, HabitIcon } from '@/components/visuals';
+import { useMe } from '@/lib/auth';
 import { formatDays, t, weekdayShort } from '@/lib/i18n';
 import { ensureNotificationPermission } from '@/lib/notifications';
 import { HABIT_COLORS, HABIT_EMOJIS, radius, space, useTheme } from '@/lib/theme';
@@ -33,6 +35,7 @@ export function HabitRow({
   onToggle,
   onPress,
   challengeTitle,
+  proof,
 }: {
   habit: Habit;
   done: boolean;
@@ -40,6 +43,8 @@ export function HabitRow({
   onToggle?: () => void;
   onPress?: () => void;
   challengeTitle?: string;
+  /** camera button / photo thumbnail for the photo proof of the day */
+  proof?: { path: string | null | undefined; onPress: () => void };
 }) {
   const theme = useTheme();
   return (
@@ -68,6 +73,14 @@ export function HabitRow({
           ) : null}
         </View>
       </View>
+      {proof ? (
+        <ProofButton
+          path={proof.path}
+          color={habit.color}
+          onPress={proof.onPress}
+          accessibilityLabel={t('proofTitle')}
+        />
+      ) : null}
       {onToggle ? (
         <CheckButton done={done} color={habit.color} onPress={onToggle} accessibilityLabel={habit.name} />
       ) : null}
@@ -197,6 +210,7 @@ export function ReminderPicker({
   onChange: (time: string | null) => void;
 }) {
   const theme = useTheme();
+  const me = useMe();
   const [showAndroid, setShowAndroid] = useState(false);
   const enabled = value !== null;
   return (
@@ -212,7 +226,7 @@ export function ReminderPicker({
           value={enabled}
           onValueChange={async (on) => {
             if (on) {
-              await ensureNotificationPermission();
+              await ensureNotificationPermission(me.id);
               onChange('09:00:00');
             } else {
               onChange(null);

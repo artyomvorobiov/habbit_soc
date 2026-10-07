@@ -12,6 +12,7 @@ import * as api from './api';
 import { useMe } from './auth';
 import { addDays, today as getToday, type ISODate } from './dates';
 import { t } from './i18n';
+import { removePhotos, withPhotoUrls } from './photos';
 import type { Challenge, Checkin, FeedItem, ReactionEmoji } from './types';
 
 export const qk = {
@@ -23,8 +24,14 @@ export const qk = {
   feed: ['feed'] as const,
   challenges: ['challenges'] as const,
   challenge: (id: string) => ['challenge', id] as const,
+  chat: (id: string) => ['challenge', id, 'chat'] as const,
+  habitPhotos: (id: string) => ['habit-photos', id] as const,
+  notifications: ['notifications'] as const,
   user: (id: string) => ['user', id] as const,
 };
+
+/** Key of a check-in in `proofs` maps. */
+export const proofKey = (habitId: string, date: ISODate) => `${habitId}|${date}`;
 
 /** Today's date; updates when the app returns to the foreground or at midnight. */
 export function useToday(): ISODate {
@@ -85,7 +92,13 @@ export function useMyCheckins() {
     enabled: !!me.id,
   });
   const index = useMemo(() => indexCheckins(query.data), [query.data]);
-  return { ...query, index };
+  /** check-ins that have a photo or a note, by proofKey() */
+  const proofs = useMemo(() => {
+    const map = new Map<string, Checkin>();
+    for (const c of query.data ?? []) if (c.photo_path || c.note) map.set(proofKey(c.habit_id, c.date), c);
+    return map;
+  }, [query.data]);
+  return { ...query, index, proofs };
 }
 
 export function useToggleCheckin() {
@@ -94,8 +107,11 @@ export function useToggleCheckin() {
   return useMutation({
     // run toggles one after another so a quick double tap ends in the right state
     scope: { id: 'checkins' },
-    mutationFn: (v: { habitId: string; date: ISODate; done: boolean }) =>
-      api.setCheckin(v.habitId, v.date, v.done),
+    mutationFn: async (v: { habitId: string; date: ISODate; done: boolean; photoPath?: string | null }) => {
+      await api.setCheckin(v.habitId, v.date, v.done);
+      // unchecking also removes the photo proof of that day
+      if (!v.done) await removePhotos([v.photoPath]);
+    },
     onMutate: async (v) => {
       const key = qk.checkins(me.id);
       await qc.cancelQueries({ queryKey: key });
@@ -110,10 +126,32 @@ export function useToggleCheckin() {
       qc.setQueryData(qk.checkins(me.id), context?.previous);
       Alert.alert(t('error'));
     },
-    onSettled: () => {
+    onSettled: (_data, _error, v) => {
       qc.invalidateQueries({ queryKey: qk.feed });
       qc.invalidateQueries({ queryKey: ['challenge'] });
+      if (!v.done) qc.invalidateQueries({ queryKey: qk.habitPhotos(v.habitId) });
     },
+  });
+}
+
+/** Everything that shows a check-in's photo or note. */
+export function useRefreshProofs() {
+  const me = useMe();
+  const qc = useQueryClient();
+  return (habitId: string) => {
+    qc.invalidateQueries({ queryKey: qk.checkins(me.id) });
+    qc.invalidateQueries({ queryKey: qk.feed });
+    qc.invalidateQueries({ queryKey: ['challenge'] });
+    qc.invalidateQueries({ queryKey: qk.habitPhotos(habitId) });
+  };
+}
+
+export function useHabitPhotos(habitId: string) {
+  const me = useMe();
+  return useQuery({
+    queryKey: qk.habitPhotos(habitId),
+    queryFn: async () => withPhotoUrls(await api.listHabitPhotos(habitId)),
+    enabled: !!me.id && !!habitId,
   });
 }
 
@@ -145,7 +183,7 @@ export function useFeed() {
   const me = useMe();
   return useInfiniteQuery({
     queryKey: qk.feed,
-    queryFn: ({ pageParam }) => api.getFeed(pageParam),
+    queryFn: async ({ pageParam }) => withPhotoUrls(await api.getFeed(pageParam)),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (last) =>
       last.length === api.FEED_PAGE ? last[last.length - 1].created_at : undefined,
@@ -244,8 +282,38 @@ export function useChallengeDetails(challenge: Challenge | undefined) {
         challenge!.start_date,
         challenge!.end_date,
       );
-      return { members, index: indexCheckins(checkins) };
+      // in photo-proof challenges only check-ins with a photo count
+      const counted = challenge!.proof_required ? checkins.filter((c) => c.photo_path) : checkins;
+      return { members, index: indexCheckins(counted) };
     },
     enabled: !!me.id && !!challenge,
   });
+}
+
+// ---------------------------------------------------------------- chat & notifications
+
+export function useChat(challengeId: string) {
+  const me = useMe();
+  return useInfiniteQuery({
+    queryKey: qk.chat(challengeId),
+    queryFn: async ({ pageParam }) => withPhotoUrls(await api.getChatMessages(challengeId, pageParam)),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (last) =>
+      last.length === api.CHAT_PAGE ? last[last.length - 1].created_at : undefined,
+    enabled: !!me.id && !!challengeId,
+    // realtime refreshes the chat instantly; polling is the fallback
+    refetchInterval: 15_000,
+  });
+}
+
+export function useNotifications() {
+  const me = useMe();
+  const query = useQuery({
+    queryKey: qk.notifications,
+    queryFn: api.getNotifications,
+    enabled: !!me.id,
+    refetchInterval: 60_000,
+  });
+  const unread = query.data?.filter((n) => !n.read_at).length ?? 0;
+  return { ...query, unread };
 }

@@ -3,14 +3,18 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { MonthCalendar } from '@/components/calendar';
-import { Button, Card, EmptyState, List, ListItem, Loading, Screen, Txt } from '@/components/ui';
+import { PhotoGrid } from '@/components/photos';
+import { Button, Card, EmptyState, List, ListItem, Loading, Screen, Section, Txt } from '@/components/ui';
 import { HabitIcon } from '@/components/visuals';
 import { deleteHabit, updateHabit } from '@/lib/api';
 import { addDays, toISODate } from '@/lib/dates';
 import { formatDays, t } from '@/lib/i18n';
+import { confirm } from '@/lib/confirm';
 import {
+  proofKey,
   useArchivedHabits,
   useChallengeByHabit,
+  useHabitPhotos,
   useMyCheckins,
   useMyHabits,
   useRefreshHabits,
@@ -30,6 +34,7 @@ export default function HabitDetails() {
   const challengeByHabit = useChallengeByHabit();
   const toggle = useToggleCheckin();
   const refresh = useRefreshHabits();
+  const photos = useHabitPhotos(id);
 
   const habit = habits.data?.find((h) => h.id === id) ?? archived.data?.find((h) => h.id === id);
 
@@ -59,6 +64,19 @@ export default function HabitDetails() {
     } catch {
       Alert.alert(t('error'));
     }
+  };
+
+  const openProof = (date: string) =>
+    router.push({ pathname: '/proof/[habitId]', params: { habitId: habit.id, date } });
+
+  const onToggle = async (date: string, done: boolean) => {
+    if (done && challenge?.proof_required) {
+      openProof(date);
+      return;
+    }
+    const photoPath = checkins.proofs.get(proofKey(habit.id, date))?.photo_path;
+    if (!done && photoPath && !(await confirm(t('uncheckTitle'), t('uncheckText'), t('uncheck')))) return;
+    toggle.mutate({ habitId: habit.id, date, done, photoPath });
   };
 
   const confirmDelete = () =>
@@ -132,7 +150,7 @@ export default function HabitDetails() {
           dates={dates}
           days={habit.days}
           color={habit.color}
-          onToggle={isArchived ? undefined : (date, done) => toggle.mutate({ habitId: habit.id, date, done })}
+          onToggle={isArchived ? undefined : onToggle}
         />
         {!isArchived ? (
           <Txt variant="footnote" tone="tertiary" style={{ textAlign: 'center' }}>
@@ -141,6 +159,19 @@ export default function HabitDetails() {
         ) : null}
       </Card>
 
+      {photos.data && photos.data.length > 0 ? (
+        <Section title={t('photoDiary')}>
+          <PhotoGrid photos={photos.data} />
+        </Section>
+      ) : null}
+
+      {!isArchived ? (
+        <Button
+          title={`📸 ${t('proofTitle')}`}
+          variant="secondary"
+          onPress={() => openProof(today)}
+        />
+      ) : null}
       <Button
         title={t('shareStreak')}
         icon="share-outline"

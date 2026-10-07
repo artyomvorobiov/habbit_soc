@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert } from 'react-native';
 
-import { ApiError, joinChallengeByCode, sendFriendRequest, type FriendRequestResult } from './api';
+import { ApiError, joinChallengeByCode, nudge, sendFriendRequest, type FriendRequestResult } from './api';
 import { t, type TKey } from './i18n';
 import { qk, useRefreshHabits } from './queries';
 
@@ -60,4 +60,14 @@ export function useJoinByCode() {
   };
 
   return { run, busy };
+}
+
+/** Sends a nudge and tells the user how it went. */
+export async function sendNudge(userId: string, challengeId?: string): Promise<void> {
+  try {
+    const result = await nudge(userId, challengeId);
+    Alert.alert(result === 'sent' ? t('nudgeSent') : t('nudgeAlready'));
+  } catch {
+    Alert.alert(t('error'));
+  }
 }

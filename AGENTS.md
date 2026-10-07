@@ -8,10 +8,15 @@ Social habit tracker: Expo (React Native, TypeScript) app + Supabase (Postgres) 
 - `src/components/` — UI building blocks (`ui.tsx` has the design primitives).
 - `src/lib/` — data and logic: `api.ts` (Supabase calls), `queries.ts` (React Query hooks),
   `streaks.ts` / `dates.ts` (pure logic, unit-tested), `i18n.ts` (all user-facing text, en + ru),
-  `notifications.ts` (local reminders), `config.ts` (app name, links).
+  `notifications.ts` (local reminders), `push.ts` (push tokens), `photos.ts` (pick, compress,
+  upload, signed links), `realtime.ts` (live chat/notifications), `recap.ts` (weekly recap),
+  `config.ts` (app name, links).
 - `supabase/schema.sql` — the whole database: tables, Row Level Security, SQL functions (RPC).
   It is idempotent; users paste it into the Supabase SQL editor.
-- `supabase/tests/` — runs the schema and behavioural tests on a local Postgres.
+- `supabase/tests/` — runs the schema and behavioural tests on a local Postgres
+  (`supabase_stub.sql` stands in for Supabase auth, storage, pg_net and realtime).
+- Photos are private: `storage.objects` access follows the check-in or chat message that
+  uses the photo (`can_view_photo()`); the app shows them through signed URLs.
 
 ## Rules
 

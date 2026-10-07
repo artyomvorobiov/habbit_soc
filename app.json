@@ -2,7 +2,7 @@
   "expo": {
     "name": "Streakmates",
     "slug": "streakmates",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "streakmates",
@@ -58,11 +58,23 @@
             ]
           }
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Streakmates lets you attach photos from your library as proof of your habits and share them in challenge chats.",
+          "cameraPermission": "Streakmates uses the camera to take photo proofs of your habits.",
+          "microphonePermission": false
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "locales": {
+      "en": "./locales/en.json",
+      "ru": "./locales/ru.json"
     }
   }
 }

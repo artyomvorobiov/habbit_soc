@@ -7,6 +7,7 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { challengeLength, challengeStatus, phaseOf } from '@/components/challenges';
 import { Button, Card, EmptyState, List, ListItem, Loading, Screen, Section, Txt } from '@/components/ui';
 import { Avatar, HabitIcon } from '@/components/visuals';
+import { sendNudge } from '@/lib/actions';
 import { inviteToChallenge, joinChallenge, leaveChallenge } from '@/lib/api';
 import { useMe } from '@/lib/auth';
 import { diffDays, toISODate, type ISODate } from '@/lib/dates';
@@ -117,7 +118,7 @@ function ChallengeDetails({ challenge }: { challenge: Challenge }) {
         style: 'destructive',
         onPress: async () => {
           try {
-            await leaveChallenge(challenge.id);
+            await leaveChallenge(challenge.id, challenge.my_habit_id);
             refresh();
             router.back();
           } catch {
@@ -154,6 +155,18 @@ function ChallengeDetails({ challenge }: { challenge: Challenge }) {
           <View style={{ width: `${(elapsed / length) * 100}%`, height: '100%', backgroundColor: challenge.color }} />
         </View>
       ) : null}
+
+      {challenge.proof_required ? (
+        <Txt variant="callout" style={{ textAlign: 'center', color: theme.flame, fontWeight: '600' }}>
+          {t('proofRequiredBadge')}
+        </Txt>
+      ) : null}
+
+      <Button
+        title={`💬 ${t('chat')}${challenge.unread_count ? ` · ${challenge.unread_count}` : ''}`}
+        variant={challenge.unread_count ? 'primary' : 'secondary'}
+        onPress={() => router.push(`/chat/${challenge.id}`)}
+      />
 
       {!joined ? (
         <Button title={t('join')} onPress={join} />
@@ -209,6 +222,16 @@ function ChallengeDetails({ challenge }: { challenge: Challenge }) {
                     <Txt variant="headline" style={{ fontVariant: ['tabular-nums'] }}>
                       {row.score}/{total}
                     </Txt>
+                    {!isMe && joined && phase === 'active' && !row.doneToday ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={t('nudge')}
+                        hitSlop={8}
+                        onPress={() => sendNudge(row.member.user_id, challenge.id)}
+                        style={[styles.nudge, { backgroundColor: theme.fill }]}>
+                        <Text style={{ fontSize: 15 }}>👉</Text>
+                      </Pressable>
+                    ) : null}
                   </View>
                   <View style={[styles.bar, { backgroundColor: theme.empty }]}>
                     <View
@@ -294,6 +317,7 @@ const styles = StyleSheet.create({
   standing: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   standingTop: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   rank: { width: 28, fontSize: 20, textAlign: 'center', fontWeight: '700' },
+  nudge: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   bar: { height: 6, borderRadius: 3, overflow: 'hidden' },
   code: {
     alignItems: 'center',

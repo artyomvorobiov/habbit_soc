@@ -1,10 +1,10 @@
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { Card, Txt } from '@/components/ui';
 import { HabitIcon } from '@/components/visuals';
 import { diffDays, type ISODate } from '@/lib/dates';
 import { countOf, formatShortDate, t } from '@/lib/i18n';
-import { space } from '@/lib/theme';
+import { radius, space } from '@/lib/theme';
 import type { Challenge } from '@/lib/types';
 
 export type ChallengePhase = 'upcoming' | 'active' | 'finished';
@@ -53,10 +53,22 @@ export function ChallengeCard({
           </Txt>
           <Txt variant="caption" tone="secondary">
             {challengeStatus(challenge, today)} · {countOf('participant', challenge.member_count)}
+            {challenge.proof_required ? ' · 📸' : ''}
           </Txt>
         </View>
+        {challenge.unread_count > 0 ? (
+          <View style={[styles.unread, { backgroundColor: challenge.color }]}>
+            <Txt variant="caption" style={{ color: '#fff', fontWeight: '700' }}>
+              💬 {challenge.unread_count}
+            </Txt>
+          </View>
+        ) : null}
       </View>
       {children}
     </Card>
   );
 }
+
+const styles = StyleSheet.create({
+  unread: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.full },
+});

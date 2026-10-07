@@ -3,7 +3,7 @@ import { View } from 'react-native';
 
 import { Streak } from '@/components/habits';
 import { ProfileHeader, StatsCard } from '@/components/profile';
-import { Button, IconButton, List, ListItem, Section, TabScreen } from '@/components/ui';
+import { Button, IconButton, List, ListItem, Section, TabScreen, Txt } from '@/components/ui';
 import { HabitIcon, WeekDots } from '@/components/visuals';
 import { useMe } from '@/lib/auth';
 import { t } from '@/lib/i18n';
@@ -56,6 +56,16 @@ export default function ProfileScreen() {
       </View>
 
       <StatsCard stats={stats} today={today} />
+
+      {list.length > 0 ? (
+        <List>
+          <ListItem
+            title={t('weeklyRecap')}
+            left={<Txt style={{ fontSize: 22 }}>📊</Txt>}
+            onPress={() => router.push('/recap')}
+          />
+        </List>
+      ) : null}
 
       {list.length > 0 ? (
         <Section title={t('myHabits')}>

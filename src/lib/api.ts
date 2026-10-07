@@ -1,8 +1,10 @@
 import { addDays, type ISODate } from './dates';
 import { supabase } from './supabase';
 import type {
+  AppNotification,
   Challenge,
   ChallengeMember,
+  ChatMessage,
   Checkin,
   FeedItem,
   Friend,
@@ -22,6 +24,7 @@ export type ApiErrorCode =
   | 'challenge_not_found'
   | 'challenge_finished'
   | 'not_invited'
+  | 'not_allowed'
   | 'username_taken'
   | 'unknown';
 
@@ -41,6 +44,7 @@ function fail(error: { message: string; code?: string }): never {
     'challenge_not_found',
     'challenge_finished',
     'not_invited',
+    'not_allowed',
   ];
   const code = known.find((k) => error.message === k);
   if (code) throw new ApiError(code, error.message);
@@ -143,8 +147,13 @@ export async function updateHabit(id: string, patch: Partial<Habit>): Promise<Ha
 }
 
 export async function deleteHabit(id: string): Promise<void> {
+  // photo proofs are files, not rows: collect them before the habit is gone
+  const photos = await fetchAll<{ photo_path: string }>((a, b) =>
+    supabase.from('checkins').select('photo_path').eq('habit_id', id).not('photo_path', 'is', null).range(a, b),
+  );
   const { error } = await supabase.from('habits').delete().eq('id', id);
   if (error) fail(error);
+  if (photos.length) await supabase.storage.from('photos').remove(photos.map((p) => p.photo_path));
 }
 
 // ---------------------------------------------------------------- check-ins
@@ -157,7 +166,7 @@ export function listCheckins(userId: string, today: ISODate): Promise<Checkin[]>
   return fetchAll<Checkin>((a, b) =>
     supabase
       .from('checkins')
-      .select('habit_id,user_id,date')
+      .select('habit_id,user_id,date,photo_path,note')
       .eq('user_id', userId)
       .gte('date', from)
       .order('date', { ascending: true })
@@ -170,7 +179,7 @@ export function listCheckinsForHabits(habitIds: string[], from: ISODate, to: ISO
   return fetchAll<Checkin>((a, b) =>
     supabase
       .from('checkins')
-      .select('habit_id,user_id,date')
+      .select('habit_id,user_id,date,photo_path')
       .in('habit_id', habitIds)
       .gte('date', from)
       .lte('date', to)
@@ -188,6 +197,55 @@ export async function setCheckin(habitId: string, date: ISODate, done: boolean):
     const { error } = await supabase.from('checkins').delete().eq('habit_id', habitId).eq('date', date);
     if (error) fail(error);
   }
+}
+
+/**
+ * Saves the photo proof and note of a day, checking the habit off if needed.
+ * Pass photoPath = null to remove the photo.
+ */
+export async function saveCheckinProof(
+  habitId: string,
+  date: ISODate,
+  photoPath: string | null,
+  note: string | null,
+  alreadyChecked = false,
+): Promise<void> {
+  if (alreadyChecked) {
+    const { data, error } = await supabase
+      .from('checkins')
+      .update({ photo_path: photoPath, note })
+      .eq('habit_id', habitId)
+      .eq('date', date)
+      .select('id');
+    if (error) fail(error);
+    if (data?.length) return;
+  }
+  const { error: insertError } = await supabase
+    .from('checkins')
+    .insert({ habit_id: habitId, date, photo_path: photoPath, note });
+  if (!insertError) return;
+  if (insertError.code !== '23505') fail(insertError);
+  // already checked off: attach the proof to the existing check-in
+  const { error } = await supabase
+    .from('checkins')
+    .update({ photo_path: photoPath, note })
+    .eq('habit_id', habitId)
+    .eq('date', date);
+  if (error) fail(error);
+}
+
+export type HabitPhoto = { date: ISODate; photo_path: string; note: string | null };
+
+export async function listHabitPhotos(habitId: string): Promise<HabitPhoto[]> {
+  const { data, error } = await supabase
+    .from('checkins')
+    .select('date,photo_path,note')
+    .eq('habit_id', habitId)
+    .not('photo_path', 'is', null)
+    .order('date', { ascending: false })
+    .limit(90);
+  if (error) fail(error);
+  return (data ?? []) as HabitPhoto[];
 }
 
 // ---------------------------------------------------------------- friends
@@ -279,6 +337,7 @@ export async function createChallenge(input: {
   start: ISODate;
   end: ISODate;
   invitees: string[];
+  proofRequired: boolean;
 }): Promise<string> {
   const { data, error } = await supabase.rpc('create_challenge', {
     p_title: input.title,
@@ -287,6 +346,7 @@ export async function createChallenge(input: {
     p_start: input.start,
     p_end: input.end,
     p_invitees: input.invitees,
+    p_proof_required: input.proofRequired,
   });
   if (error) fail(error);
   return data as string;
@@ -311,14 +371,95 @@ export async function joinChallengeByCode(code: string): Promise<string> {
   return data as string;
 }
 
-export async function leaveChallenge(challengeId: string): Promise<void> {
+export async function leaveChallenge(challengeId: string, habitId?: string | null): Promise<void> {
+  const photos = habitId ? await listHabitPhotos(habitId) : [];
   const { error } = await supabase.rpc('leave_challenge', { p_challenge: challengeId });
+  if (error) fail(error);
+  if (!photos.length) return;
+  // a running challenge takes its habit (and check-ins) with it; files stay unless removed
+  const { data: stillThere } = await supabase.from('habits').select('id').eq('id', habitId!).maybeSingle();
+  if (!stillThere) await supabase.storage.from('photos').remove(photos.map((p) => p.photo_path));
+}
+
+// ---------------------------------------------------------------- chat
+
+export const CHAT_PAGE = 50;
+
+export async function getChatMessages(challengeId: string, before?: string): Promise<ChatMessage[]> {
+  const { data, error } = await supabase.rpc('get_challenge_messages', {
+    p_challenge: challengeId,
+    p_before: before ?? null,
+    p_limit: CHAT_PAGE,
+  });
+  if (error) fail(error);
+  return (data ?? []) as ChatMessage[];
+}
+
+export async function sendChatMessage(
+  challengeId: string,
+  message: { body: string } | { photoPath: string; body?: string },
+): Promise<void> {
+  const row: { challenge_id: string; kind: 'text' | 'photo'; body: string | null; photo_path: string | null } =
+    'photoPath' in message
+      ? { challenge_id: challengeId, kind: 'photo', photo_path: message.photoPath, body: message.body || null }
+      : { challenge_id: challengeId, kind: 'text', photo_path: null, body: message.body };
+  const { error } = await supabase.from('challenge_messages').insert(row);
+  if (error) fail(error);
+}
+
+export async function deleteChatMessage(messageId: string): Promise<void> {
+  const { error } = await supabase.from('challenge_messages').delete().eq('id', messageId);
+  if (error) fail(error);
+}
+
+export async function markChatRead(challengeId: string): Promise<void> {
+  const { error } = await supabase.rpc('mark_chat_read', { p_challenge: challengeId });
+  if (error) fail(error);
+}
+
+// ---------------------------------------------------------------- notifications
+
+export async function getNotifications(): Promise<AppNotification[]> {
+  const { data, error } = await supabase.rpc('get_notifications', { p_limit: 60 });
+  if (error) fail(error);
+  return (data ?? []) as AppNotification[];
+}
+
+export async function markNotificationsRead(): Promise<void> {
+  const { error } = await supabase.rpc('mark_notifications_read');
+  if (error) fail(error);
+}
+
+/** Returns 'sent' or 'already_sent' (one nudge per person per day). */
+export async function nudge(userId: string, challengeId?: string): Promise<'sent' | 'already_sent'> {
+  const { data, error } = await supabase.rpc('nudge', {
+    p_user: userId,
+    p_challenge: challengeId ?? null,
+  });
+  if (error) fail(error);
+  return data as 'sent' | 'already_sent';
+}
+
+export async function registerPushToken(token: string, locale: string): Promise<void> {
+  const { error } = await supabase.rpc('register_push_token', { p_token: token, p_locale: locale });
+  if (error) fail(error);
+}
+
+export async function unregisterPushToken(token: string): Promise<void> {
+  const { error } = await supabase.rpc('unregister_push_token', { p_token: token });
   if (error) fail(error);
 }
 
 // ---------------------------------------------------------------- account
 
-export async function deleteAccount(): Promise<void> {
+export async function deleteAccount(userId: string): Promise<void> {
+  // photos are files, not rows: remove them before the account itself
+  for (let round = 0; round < 50; round++) {
+    const { data: files } = await supabase.storage.from('photos').list(userId, { limit: 1000 });
+    if (!files?.length) break;
+    const { error } = await supabase.storage.from('photos').remove(files.map((f) => `${userId}/${f.name}`));
+    if (error) break;
+  }
   const { error } = await supabase.rpc('delete_account');
   if (error) fail(error);
   await supabase.auth.signOut({ scope: 'local' });

@@ -8,7 +8,9 @@ import { Button, Card, Chip, EmptyState, IconButton, Section, TabScreen, Txt } f
 import { haptic, ProgressRing } from '@/components/visuals';
 import { addDays, toISODate, type ISODate } from '@/lib/dates';
 import { formatLongDate, t, type TKey } from '@/lib/i18n';
+import { confirm } from '@/lib/confirm';
 import {
+  proofKey,
   useChallengeByHabit,
   useMyCheckins,
   useMyHabits,
@@ -65,9 +67,20 @@ export default function TodayScreen() {
     return list.length ? list.filter((h) => isDone(h, date)).length / list.length : 0;
   };
 
-  const onToggle = (h: Habit) => {
+  const proofOf = (h: Habit) => checkins.proofs.get(proofKey(h.id, selected));
+  const openProof = (h: Habit) =>
+    router.push({ pathname: '/proof/[habitId]', params: { habitId: h.id, date: selected } });
+
+  const onToggle = async (h: Habit) => {
     const done = !isDone(h, selected);
-    toggle.mutate({ habitId: h.id, date: selected, done });
+    // photo-proof challenges: checking in means taking the photo
+    if (done && challengeByHabit.get(h.id)?.proof_required) {
+      openProof(h);
+      return;
+    }
+    const photoPath = proofOf(h)?.photo_path;
+    if (!done && photoPath && !(await confirm(t('uncheckTitle'), t('uncheckText'), t('uncheck')))) return;
+    toggle.mutate({ habitId: h.id, date: selected, done, photoPath });
     if (done && planned.includes(h) && doneCount + 1 === planned.length) haptic('success');
   };
 
@@ -82,6 +95,11 @@ export default function TodayScreen() {
       streak={currentStreak(checkins.index.get(h.id) ?? new Set(), h.days, today)}
       challengeTitle={challengeByHabit.get(h.id)?.title}
       onToggle={() => onToggle(h)}
+      proof={
+        isDone(h, selected) || challengeByHabit.get(h.id)?.proof_required
+          ? { path: proofOf(h)?.photo_path, onPress: () => openProof(h) }
+          : undefined
+      }
       onPress={() => router.push(`/habit/${h.id}`)}
     />
   );

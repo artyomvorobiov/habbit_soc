@@ -7,7 +7,7 @@ import { Streak } from '@/components/habits';
 import { ProfileHeader, StatsCard } from '@/components/profile';
 import { Button, Card, EmptyState, List, ListItem, Loading, Screen, Section, Txt } from '@/components/ui';
 import { HabitIcon, WeekDots } from '@/components/visuals';
-import { addFriend } from '@/lib/actions';
+import { addFriend, sendNudge } from '@/lib/actions';
 import { blockUser, removeFriend, reportUser, respondFriendRequest } from '@/lib/api';
 import { useMe } from '@/lib/auth';
 import { t } from '@/lib/i18n';
@@ -124,10 +124,19 @@ export function UserProfile({ userId }: { userId: string }) {
       <ProfileHeader avatar={profile.avatar} name={profile.display_name} username={profile.username} />
 
       {relation === 'friend' ? (
-        <Button
-          title={`🏆 ${t('challengeFriend')}`}
-          onPress={() => router.push({ pathname: '/challenge/new', params: { invite: userId } })}
-        />
+        <View style={{ flexDirection: 'row', gap: space.sm }}>
+          <Button
+            title={`🏆 ${t('challengeFriend')}`}
+            onPress={() => router.push({ pathname: '/challenge/new', params: { invite: userId } })}
+            style={{ flex: 1 }}
+          />
+          <Button
+            title={`👉 ${t('nudge')}`}
+            variant="secondary"
+            onPress={() => sendNudge(userId)}
+            style={{ flex: 1 }}
+          />
+        </View>
       ) : relation === 'incoming' ? (
         <View style={{ flexDirection: 'row', gap: space.sm }}>
           <Button title={t('accept')} onPress={() => run(() => respondFriendRequest(userId, true))} style={{ flex: 1 }} />

@@ -2,6 +2,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import { addDays, type ISODate } from './dates';
+import { registerForPush } from './push';
 import { t } from './i18n';
 import { isScheduled } from './streaks';
 import type { Habit } from './types';
@@ -28,7 +29,7 @@ if (supported) {
 }
 
 /** Asks for permission if needed. Returns true when notifications are allowed. */
-export async function ensureNotificationPermission(): Promise<boolean> {
+export async function ensureNotificationPermission(userId?: string): Promise<boolean> {
   if (!supported) return false;
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('reminders', {
@@ -40,7 +41,15 @@ export async function ensureNotificationPermission(): Promise<boolean> {
   if (current.granted) return true;
   if (!current.canAskAgain) return false;
   const next = await Notifications.requestPermissionsAsync();
+  // the same permission covers pushes from friends
+  if (next.granted && userId) registerForPush(userId);
   return next.granted;
+}
+
+/** Whether notifications are allowed, without asking. */
+export async function notificationsAllowed(): Promise<boolean> {
+  if (!supported) return false;
+  return (await Notifications.getPermissionsAsync()).granted;
 }
 
 function parseTime(time: string): { hour: number; minute: number } {
