@@ -8,14 +8,14 @@
     "scheme": "streakmates",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "bundleIdentifier": "com.yourname.streakmates",
+      "bundleIdentifier": "com.artem.streakmates",
       "supportsTablet": false,
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.yourname.streakmates",
+      "package": "com.artem.streakmates",
       "adaptiveIcon": {
         "backgroundColor": "#FF7A33",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
