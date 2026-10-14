@@ -72,7 +72,7 @@
 
 ## 10. Контакты
 
-По вопросам конфиденциальности пишите на: **[ваш email]**
+По вопросам конфиденциальности пишите на: vorobev.artem2003@gmail.com
 
 ---
 
@@ -150,4 +150,4 @@ We may update this policy. The new version is published on this page with a new 
 
 ## 10. Contact
 
-For privacy questions, email: **[your email]**
+For privacy questions, email: vorobev.artem2003@gmail.com

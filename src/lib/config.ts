@@ -11,8 +11,8 @@ export const APP_SCHEME = 'streakmates';
  */
 export const INVITE_BASE_URL = `${APP_SCHEME}://`;
 
-export const PRIVACY_POLICY_URL = 'https://example.com/privacy';
-export const SUPPORT_EMAIL = 'support@example.com';
+export const PRIVACY_POLICY_URL = 'https://docs.google.com/document/d/e/2PACX-1vQQXk7ITkKw8aMF-KZfXEfqt1IlSrqp8d7himMwaZzPrZQX4fN4RIb-hhMk0SUGd4B66_7JyKTyJ6wv/pub';
+export const SUPPORT_EMAIL = 'vorobev.artem2003@gmail.com';
 
 export const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
 
