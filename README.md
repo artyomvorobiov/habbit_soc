@@ -270,14 +270,58 @@ TestFlight (официальная бета-раздача Apple).
 После этого телефон получит push, когда друг поставит реакцию, пришлёт заявку, позовёт
 в челлендж, «пнёт» или напишет в чат.
 
-### Android (когда будете готовы)
+### Android: Google Play и RuStore
 
-Код уже кроссплатформенный, отдельно писать ничего не нужно.
+Код уже кроссплатформенный, отдельно писать ничего не нужно. В `eas.json` есть три профиля:
+`preview` (APK для установки на свой телефон), `production` (AAB для Google Play) и
+`rustore` (APK для RuStore).
 
-- Протестировать: установите **Expo Go** из Google Play и отсканируйте тот же QR-код.
-- Собрать: `eas build --platform android --profile production`.
-- Опубликовать: аккаунт [Google Play Console](https://play.google.com/console) (разовый взнос
-  $25), затем `eas submit --platform android --latest`.
+**1. Проверить на телефоне**
+- Быстро: установите **Expo Go** из Google Play и отсканируйте QR-код из `npx expo start`.
+- Как настоящее приложение: `npx eas-cli@latest build --platform android --profile preview`.
+  В конце будет ссылка и QR-код: откройте её на телефоне, скачайте APK и установите
+  (Android попросит разрешить установку из этого источника).
+
+**2. Push-уведомления на Android (Firebase)**
+Без этого шага всё работает, кроме push (напоминания приходят и так).
+1. [console.firebase.google.com](https://console.firebase.google.com) → создайте проект →
+   **Add app → Android**, package name `com.artem.streakmates` (как в `app.json`).
+2. Скачайте `google-services.json`, положите в корень проекта и добавьте в `app.json` в раздел
+   `android` строку `"googleServicesFile": "./google-services.json"`.
+3. Firebase → ⚙️ **Project settings → Service accounts → Generate new private key**: скачается
+   JSON-ключ. **Не кладите его в проект.**
+4. `npx eas-cli@latest credentials` → Android → production → **Google Service Account →
+   Manage your Google Service Account Key for Push Notifications (FCM V1)** → загрузите этот ключ.
+5. Пересоберите приложение.
+
+**3. Google Play**
+1. Аккаунт [Google Play Console](https://play.google.com/console): разовый взнос $25
+   (карта должна быть иностранной), проверка личности.
+2. **Для новых личных аккаунтов** Google требует закрытое тестирование: не меньше
+   **12 тестировщиков** в течение **14 дней подряд**. Только после этого можно запросить
+   публикацию для всех. Соберите друзей заранее.
+3. В консоли: **Create app**, затем заполните *App content*: ссылка на политику
+   конфиденциальности, **Data safety** (email, имя, фото, сообщения; данные шифруются при
+   передаче; пользователь может удалить аккаунт), **ссылка на удаление аккаунта** (подойдёт
+   опубликованная политика: в разделе 7 написано, как удалить аккаунт), возрастной рейтинг,
+   целевая аудитория (13+), реклама: нет.
+4. Сборка: `npx eas-cli@latest build --platform android --profile production` (файл `.aab`).
+5. **Первый раз загрузите `.aab` вручную**: скачайте его со страницы сборки на expo.dev,
+   затем Play Console → *Testing → Internal testing* (или *Closed testing*) → *Create new release*.
+6. Дальше можно отправлять из консоли: создайте в Google Cloud сервисный аккаунт с доступом к
+   Play Console ([инструкция Expo](https://github.com/expo/fyi/blob/main/creating-google-service-account.md))
+   и запустите `npx eas-cli@latest submit --platform android --latest`. Сборка уйдёт черновиком
+   во внутреннее тестирование. Когда приложение опубликуется, в `eas.json` можно поменять
+   `track` на `production`, а `releaseStatus` на `completed`.
+
+**4. RuStore**
+1. [console.rustore.ru](https://console.rustore.ru): регистрация бесплатная, физлицо может
+   публиковать бесплатные приложения (вход через VK ID, подтверждение через Госуслуги).
+2. Сборка: `npx eas-cli@latest build --platform android --profile rustore` (файл `.apk`).
+3. В консоли: *Создать приложение* → загрузите APK, иконку 512×512, скриншоты, описание,
+   ссылку на политику конфиденциальности, возрастной рейтинг. Модерация обычно 1–5 рабочих дней.
+4. Google Play переподписывает приложение своим ключом, поэтому версии из Google Play и
+   RuStore подписаны по-разному. Кто установил из одного магазина, обновляется из него же.
 
 ---
 
